@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<title>Booth</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:#0b0c0e;color:#e9ecf1;
+       font:14px/1.6 "Segoe UI",system-ui,sans-serif;
+       display:flex;align-items:center;justify-content:center}
+  .card{width:min(680px,88vw);text-align:center}
+  .mark{font:700 13px/1 "Segoe UI",sans-serif;letter-spacing:.34em;color:#8b93a1;
+        margin-bottom:26px}
+  .sp{width:26px;height:26px;margin:0 auto 20px;border:2px solid #3ecf8e;
+      border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  h1{font-size:17px;font-weight:600;margin:0 0 10px}
+  p{color:#8b93a1;margin:0 0 6px;font-size:13px}
+  .detail{color:#5a616d;font-size:12px;font-family:ui-monospace,Consolas,monospace;
+          word-break:break-all;margin-top:14px}
+  .steps{margin:24px auto 0;text-align:left;width:max-content;color:#5a616d;font-size:12px}
+  .steps div{padding:3px 0;display:flex;gap:9px;align-items:baseline}
+  .steps .t{width:15px;color:#3ecf8e}
+  .steps .pending .t{color:#3a3f47}
+  .steps .now{color:#e9ecf1}
+  button{background:#22252b;border:1px solid #32363e;color:#e9ecf1;border-radius:6px;
+         padding:8px 16px;cursor:pointer;font-size:13px;margin:18px 5px 0}
+  button:hover{background:#2a2e36}
+  button.go{background:#2f6f52;border-color:#3a8a66}
+  .err h1{color:#e05a5a}
+  .err .sp{display:none}
+  .sp[hidden]{display:none!important}
+  .hint{color:#8b93a1;font-size:12px;margin-top:16px;line-height:1.7}
+  code{background:#15171b;padding:1px 6px;border-radius:4px;color:#b9c0cb;
+       font-family:ui-monospace,Consolas,monospace;font-size:11px}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="mark">BOOTH</div>
+  <div class="sp" id="sp" hidden></div>
+  <h1 id="title">No project open</h1>
+  <p id="msg">Create a project, or open one you already have.</p>
+  <div class="detail" id="detail"></div>
+  <div class="steps" id="steps"></div>
+  <div id="actions">
+    <button class="go" data-act="new">New project…</button>
+    <button data-act="open">Open project…</button>
+  </div>
+</div>
+<script>
+"use strict";
+const $ = (i) => document.getElementById(i);
+const STEPS = [
+  ["root", "find the project"],
+  ["service", "start the local service"],
+  ["model", "get ready"],
+];
+let state = { step: "root", done: [] };
+
+function render() {
+  $("steps").innerHTML = STEPS.map(([key, label]) => {
+    const done = state.done.includes(key);
+    const now = state.step === key;
+    return `<div class="${done ? "" : now ? "now" : "pending"}">` +
+           `<span class="t">${done ? "✓" : now ? "›" : "·"}</span>${label}</div>`;
+  }).join("");
+}
+
+window.booth.onStatus((s) => {
+  state = Object.assign(state, s);
+  $("sp").hidden = !s.busy;
+  $("steps").style.display = s.busy || s.error ? "" : "none";
+  $("title").textContent = s.title || "No project open";
+  $("msg").textContent = s.message || "";
+  $("detail").textContent = s.detail || "";
+  $("card").className = "card" + (s.error ? " err" : "");
+  $("actions").innerHTML = (s.actions || [])
+    .map((a) => `<button class="${a.primary ? "go" : ""}" data-act="${a.id}">${a.label}</button>`)
+    .join("");
+  if (s.hint) $("actions").insertAdjacentHTML("beforeend", `<div class="hint">${s.hint}</div>`);
+  render();
+});
+
+$("actions").addEventListener("click", (e) => {
+  const id = e.target.getAttribute && e.target.getAttribute("data-act");
+  if (id) window.booth.action(id);
+});
+$("steps").style.display = "none";
+render();
+</script>
+</body>
+</html>

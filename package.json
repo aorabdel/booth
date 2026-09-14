@@ -1,0 +1,106 @@
+{
+  "name": "booth",
+  "version": "1.0.0",
+  "description": "Recording and review cockpit for the Arabic dub",
+  "main": "main.js",
+  "private": true,
+  "author": "Booth",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "icons": "python build/make_icons.py",
+    "serve": "node server.js",
+    "dist": "electron-builder --win",
+    "pack": "electron-builder --win --dir"
+  },
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.booth.dub",
+    "productName": "Booth",
+    "artifactName": "Booth-Setup-${version}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "project-file.js",
+      "public/**/*",
+      "build/icon.ico",
+      "build/icon.png"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Booth",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "Booth-${version}-portable.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png",
+      "category": "AudioVideo"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.music"
+    },
+    "extraResources": [
+      {
+        "from": "../pipeline",
+        "to": "pipeline",
+        "filter": [
+          "**/*.py",
+          "!**/__pycache__/**"
+        ]
+      },
+      {
+        "from": "../RUNBOOK.md",
+        "to": "RUNBOOK.md"
+      }
+    ],
+    "fileAssociations": [
+      {
+        "ext": "booth",
+        "name": "Booth project",
+        "description": "Booth dubbing project",
+        "icon": "build/icon.ico",
+        "role": "Editor"
+      }
+    ]
+  }
+}
