@@ -432,7 +432,7 @@ function drawTakes() {
 
 // ------------------------------------------------------------------- timeline
 /* A scrolling track at a fixed pixels-per-second, the way an NLE does it,
- * rather than a window pinned to the playhead: at 116 minutes you need to be
+ * rather than a window pinned to the playhead: at feature length you need to be
  * able to sit still and look at one place. Wheel zooms about the pointer,
  * horizontal wheel pans, and the view follows the playhead while playing until
  * the user scrolls, after which they are in charge until playback restarts. */
@@ -1208,7 +1208,7 @@ function frame() {
     $("meter").className = pk > 0.89 ? "hot" : "";
   }
 
-  // Redrawing 738 lines across two canvases every frame while capturing audio
+  // Redrawing hundreds of lines across two canvases every frame while capturing audio
   // starves the thread the microphone blocks arrive on. The meter above still
   // runs at full rate; only the canvases slow down while a take is rolling.
   const now = performance.now();

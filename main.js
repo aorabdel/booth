@@ -56,7 +56,7 @@ function icon() {
 function pipelineRoot() {
   const packaged = path.join(process.resourcesPath || "", "pipeline");
   if (fs.existsSync(packaged)) return path.dirname(packaged);
-  return path.resolve(__dirname, "..");
+  return __dirname;   // running from the repo checkout, pipeline/ sits beside main.js
 }
 
 // ------------------------------------------------------------------ settings

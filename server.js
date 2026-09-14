@@ -8,7 +8,7 @@
  * Nothing listens on an external interface and no browser is involved.
  *
  * Also runnable headless for development:
- *   node booth/server.js [--port 7800] [--root E:\dub] [--no-asr]
+ *   node server.js [--port 7800] [--root E:\dub] [--no-asr]
  */
 
 "use strict";
@@ -630,15 +630,14 @@ if (require.main === module) {
     return i >= 0 && i + 1 < argv.length ? argv[i + 1] : dflt;
   };
   startServer({
-    root: arg("--root", path.resolve(__dirname, "..")),
+    root: arg("--root", process.cwd()),
+    pipelineRoot: __dirname,   // pipeline/ ships beside this file
     port: parseInt(arg("--port", "7800"), 10),
     python: arg("--python", "python"),
     noAsr: argv.includes("--no-asr"),
   }).then((s) => {
-    console.log(`booth  →  ${s.url("stage.html")}    (actor)`);
-    console.log(`         ${s.url("control.html")}  (operator)`);
-    console.log(`         ${s.url("review.html")}   (watch progress)`);
-    console.log(`project: ${path.join(s.root, "project", "project.json")}`);
+    console.log(`booth  →  ${s.url("app.html")}`);
+    console.log(`project: ${s.projectJson}`);
     for (const sig of ["SIGINT", "SIGTERM"]) {
       process.on(sig, () => s.stop().then(() => process.exit(0)));
     }

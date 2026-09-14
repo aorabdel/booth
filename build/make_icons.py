@@ -1,11 +1,11 @@
-"""Generate the Windows .ico and PNG icon set from booth.png.
+"""Generate the Windows .ico and PNG icon set from booth.png at the repo root.
 
 electron-builder wants build/icon.ico for the installer, the executable and the
 window; a 512px PNG covers everything else. Rather than add an image library,
 sizes are resampled with ffmpeg and packed into an ICO by hand - the format is
 just a directory followed by embedded PNGs.
 
-    python booth/build/make_icons.py
+    python build/make_icons.py
 """
 
 import struct
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parent.parent
+ROOT = HERE.parent
 SRC = ROOT / "booth.png"
 SIZES = [16, 24, 32, 48, 64, 128, 256]
 

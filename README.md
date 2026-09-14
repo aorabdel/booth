@@ -29,7 +29,7 @@ flowchart LR
   Main["main.js<br/>Electron main: window, menus, dialogs"]
   Server["server.js<br/>loopback HTTP on 127.0.0.1"]
   PF["project-file.js<br/>.booth read / write / relink"]
-  Py["../pipeline (Python)<br/>checkd · ingest · peaks · fit · export"]
+  Py["pipeline/ (Python)<br/>checkd · ingest · peaks · fit · export"]
   Disk[("project folder<br/>media · takes · out")]
 
   Main -- IPC via preload.js --> UI
@@ -46,12 +46,11 @@ The UI talks to a local HTTP server instead of using IPC. The guide video can be
 ## Requirements
 
 - [Node.js](https://nodejs.org/) LTS and npm
-- `python` and `ffmpeg` on `PATH`
-- A Whisper build for the checker (set `WHISPER_DIR`)
-- The **Python pipeline** in a sibling folder, `../pipeline`, and optionally `../RUNBOOK.md`
+- Python 3.12 as `python` on `PATH`, with `numpy` (`pip install numpy`)
+- `ffmpeg` on `PATH`, built with the `rubberband` filter (e.g. the gyan.dev full build on Windows)
+- A whisper.cpp build for the speech checker, with `bin/` and `models/ggml-arabic-turbo.bin`. Point `WHISPER_DIR` at it (default `E:\whisper`)
 
-> [!IMPORTANT]
-> The pipeline and runbook are **not in this repository**. In development Booth looks for `pipeline/` in the parent of this folder. `npm run dist` / `npm run pack` also bundle `../pipeline` and `../RUNBOOK.md` as `extraResources`, so both must exist for a packaged build.
+In development Booth runs the pipeline from `pipeline/` in this repo. Packaged builds ship `pipeline/` (without `__pycache__`) and `RUNBOOK.md` as `extraResources`.
 
 ## Getting started
 
@@ -74,7 +73,18 @@ On the welcome screen choose **New project…**, then import the translation scr
 | `npm run serve -- --root <dir> [--port 7800] [--python python] [--no-asr]` | Runs the local service headless for development. Open `http://127.0.0.1:7800/app.html` |
 | `npm run pack` | Builds an unpacked Windows app into `dist/` (quick packaging check) |
 | `npm run dist` | Builds the Windows NSIS installer and portable `.exe` into `dist/` |
-| `npm run icons` | Regenerates `build/icon.ico`, `icon.png` and `icon_256.png` from `../booth.png` (needs `ffmpeg`) |
+| `npm run icons` | Regenerates `build/icon.ico`, `icon.png` and `icon_256.png` from `booth.png` at the repo root (needs `ffmpeg`) |
+
+The pipeline steps the app runs can also be run by hand from the repo root. Pass `--project` so they don't default to `./project`:
+
+```bash
+python -m pipeline.ingest    --project "<dub>/project/project.json" --xlsx script.xlsx --video film.mp4 --force
+python -m pipeline.fit       --project "<dub>/project/project.json"
+python -m pipeline.recheck   --project "<dub>/project/project.json"
+python -m pipeline.export    --project "<dub>/project/project.json" --what mix --out mix.wav
+```
+
+See [RUNBOOK.md](RUNBOOK.md) for every step (`salvage`, `preflight`, `reattach`, …), the verdict tables and the project format.
 
 Useful environment variables:
 
@@ -113,7 +123,19 @@ booth/
 │   ├── icon.ico      # Windows app, installer and file-association icon
 │   ├── icon.png      # 512px icon (Linux/macOS, README)
 │   ├── icon_256.png  # 256px icon
-│   └── make_icons.py # Generates the icons from ../booth.png
+│   └── make_icons.py # Generates the icons from booth.png
+├── pipeline/         # Python (stdlib + ffmpeg): run as `python -m pipeline.<step>`
+│   ├── checkd.py     # Long-running checker daemon: take verdicts, per-clip re-renders
+│   ├── ingest.py     # Script + video → project.json, extracted audio
+│   ├── peaks.py      # Waveform peaks for the timeline
+│   ├── fit.py        # Assembles takes onto the timeline (trim, borrow, stretch)
+│   ├── export.py     # Narration stem, mix, dubbed MP4
+│   ├── recheck.py    # Replays stored verdicts through the current checker
+│   ├── preflight.py  # Estimates which lines can be spoken in time
+│   ├── salvage.py    # Recovers takes from earlier recording sessions
+│   ├── reattach.py   # Re-links take files missing from project.json
+│   └── dubkit/       # Shared helpers: arabic, asr, ff, project, silence, srt, wav, xlsx
+├── RUNBOOK.md        # Operator guide: every pipeline step, verdicts, project format
 └── package.json      # Scripts and electron-builder configuration
 ```
 

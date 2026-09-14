@@ -81,7 +81,7 @@
     },
     "extraResources": [
       {
-        "from": "../pipeline",
+        "from": "pipeline",
         "to": "pipeline",
         "filter": [
           "**/*.py",
@@ -89,7 +89,7 @@
         ]
       },
       {
-        "from": "../RUNBOOK.md",
+        "from": "RUNBOOK.md",
         "to": "RUNBOOK.md"
       }
     ],
