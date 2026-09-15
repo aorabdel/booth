@@ -22,7 +22,7 @@
     "productName": "Booth",
     "artifactName": "Booth-Setup-${version}.${ext}",
     "directories": {
-      "output": "dist",
+      "output": "dist/${os}",
       "buildResources": "build"
     },
     "files": [
