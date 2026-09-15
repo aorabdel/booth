@@ -105,6 +105,7 @@ class Dub {
     this.buffers = new Map();   // render url -> AudioBuffer, in use order
     this.pending = new Map();   // render url -> in-flight decode
     this.playing = new Map();   // line n -> source
+    this.gen = 0;               // bumped by stopAll, so a tick that awaited across a seek bails
     this.volume = 1;
   }
 
@@ -168,6 +169,7 @@ class Dub {
   }
 
   stopAll() {
+    this.gen++;
     for (const src of this.playing.values()) { try { src.stop(); } catch (e) { /* ended */ } }
     this.playing.clear();
   }
@@ -176,20 +178,25 @@ class Dub {
   async tick(mediaTime) {
     if (!S.playing) return;
     const ctx = this.ensure();
+    const gen = this.gen;
     for (const l of S.nar) {
       if (!hasClip(l) || this.playing.has(l.n)) continue;
       const at = placedAt(l), dur = placedDur(l);
       const lead = at - mediaTime;
       if (lead > 0.35 || lead < -dur) continue;          // not due yet, or missed
       const buf = await this.buffer(clipUrl(l));
-      if (!buf || !S.playing) continue;
+      // Every frame runs a tick, so while this awaited a decode another tick may
+      // have started the clip, or a seek may have made this one stale.
+      if (!buf || !S.playing || gen !== this.gen || this.playing.has(l.n)) continue;
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(this.gain);
       const offset = Math.max(0, -lead);
       const when = ctx.currentTime + Math.max(0, lead);
       src.start(when, offset);
-      src.onended = () => this.playing.delete(l.n);
+      // A stopped source reports `ended` later, after a seek may already have
+      // started this line again; only remove the entry if it is still ours.
+      src.onended = () => { if (this.playing.get(l.n) === src) this.playing.delete(l.n); };
       this.playing.set(l.n, src);
     }
   }
