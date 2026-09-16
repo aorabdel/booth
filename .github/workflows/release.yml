@@ -1,0 +1,66 @@
+name: Release
+
+# Push a tag like v1.0.0 to build the Windows installer, upload it to a draft
+# release, write the changelog from the commit titles, and publish it. Installed
+# copies only see published releases, so users never get a half-uploaded one.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # full history and tags, for the changelog
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Check the tag matches package.json
+        shell: bash
+        run: |
+          v="v$(node -p "require('./package.json').version")"
+          if [ "$v" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $v"
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: Build and upload to a draft release
+        run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write the changelog from commit titles
+        shell: bash
+        run: |
+          prev="$(git describe --tags --abbrev=0 --match 'v*' "$GITHUB_REF_NAME^" 2>/dev/null || true)"
+          range="${prev:+$prev..}$GITHUB_REF_NAME"
+          {
+            echo "## Changes"
+            echo
+            git log --no-merges --format='- %s' "$range" \
+              | grep -vE '^- (Initial commit|Release v[0-9])' || true
+            if [ -n "$prev" ]; then
+              echo
+              echo "**Full diff:** https://github.com/$GITHUB_REPOSITORY/compare/$prev...$GITHUB_REF_NAME"
+            fi
+          } > notes.md
+          cat notes.md
+
+      - name: Publish the release
+        shell: bash
+        run: >
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
+          --title "Booth ${GITHUB_REF_NAME#v}" --notes-file notes.md
+          --draft=false --latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
