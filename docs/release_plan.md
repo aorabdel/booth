@@ -3,7 +3,8 @@
 Goal: publishing a new version makes every installed copy of Booth download it
 in the background and offer to install it with a popup.
 
-Status: **not implemented.** This document is the plan.
+Status: **implemented.** The first release is `v1.0.0`; see
+[Releasing a version](#releasing-a-version).
 
 ## Approach
 
@@ -53,78 +54,53 @@ Add scripts:
 
 ### 3. `main.js`
 
-Call `initAutoUpdater()` from `app.whenReady()`:
+`initAutoUpdater()` (the "updates" section of `main.js`) runs from
+`app.whenReady()`:
 
-```js
-const { autoUpdater } = require("electron-updater");
-
-function initAutoUpdater() {
-  // Dev runs and the portable .exe can't update themselves.
-  if (!app.isPackaged || process.env.PORTABLE_EXECUTABLE_DIR) return;
-
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;   // "Later" still installs on the next quit
-  autoUpdater.on("error", (e) => log("updater:", e.message));
-
-  autoUpdater.on("update-downloaded", async (info) => {
-    const { response } = await dialog.showMessageBox(win, {
-      type: "info", icon: icon(), title: "Booth",
-      message: `Booth ${info.version} is ready to install`,
-      detail: "Restart now to update. Your takes are already saved.",
-      buttons: ["Restart and update", "Later"], defaultId: 0, cancelId: 1,
-    });
-    if (response === 0) autoUpdater.quitAndInstall();
-  });
-
-  autoUpdater.checkForUpdates().catch(() => {});
-  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 60 * 60 * 1000);
-}
-```
-
-Notes:
-
+- Skips dev runs and the portable `.exe`, which can't update themselves.
+- Checks at startup and then hourly, and downloads new versions in the
+  background (`autoDownload`). "Later" still installs on the next quit
+  (`autoInstallOnAppQuit`).
+- When a download finishes, shows **Restart and update / Later**, once per
+  version so the hourly check doesn't nag.
+- Updater events and errors go to `<userData>/booth.log` as `updater:` lines.
 - `quitAndInstall()` goes through the existing `before-quit` handler, so
   `saveSession()` and `service.stop()` still run.
-- **Don't interrupt a take.** Recording state lives in the page, not the main
-  process. Expose it through `preload.js` (e.g. the page reports when a take
-  starts and stops), and hold the popup until no take is rolling.
+
+**A take is never interrupted.** Recording state lives in the page, so
+`setRollUi()` in `public/app.js` reports it through
+`window.booth.setRecording()` (`preload.js`, IPC `booth:recording`). The popup
+waits until no take is rolling.
 
 ### 4. `.github/workflows/release.yml`
 
-Runs on version tags and publishes the release once every file is uploaded:
+Runs on `v*.*.*` tags, on `windows-latest`, with `contents: write`:
 
-```yaml
-name: Release
+1. Checks out the full history and tags, and sets up Node 24.
+2. Fails if the tag doesn't match the `package.json` version.
+3. `npm ci`, then `npm run release`, which builds and uploads to a draft
+   release.
+4. Writes the **changelog from the conventional commit titles** since the
+   previous `v*` tag (all commits for the first release), skipping
+   `Initial commit` and `Release vX.Y.Z` bump commits, plus a compare link.
+5. Publishes the release as **Booth X.Y.Z** with that changelog and marks it
+   latest.
 
-on:
-  push:
-    tags: ["v*.*.*"]
-
-permissions:
-  contents: write
-
-jobs:
-  release:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish the draft release
-        run: gh release edit ${{ github.ref_name }} --repo aorabdel/booth --draft=false --latest
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-No secrets are needed beyond the built-in `GITHUB_TOKEN`.
+No secrets are needed beyond the built-in `GITHUB_TOKEN`. Because the changelog
+is built from commit titles, keep every commit title in conventional form
+(`feat: …`, `fix: …`, `chore: …`).
 
 ## Releasing a version
+
+**First release (`v1.0.0`).** `package.json` is already `1.0.0`, so tag
+without bumping:
+
+```bash
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
+```
+
+**Every release after that:**
 
 1. Commit everything so the working tree is clean.
 2. Run `npm run cut:patch` (or `cut:minor` / `cut:major`). It bumps
@@ -133,6 +109,48 @@ No secrets are needed beyond the built-in `GITHUB_TOKEN`.
    and `latest.yml` to a draft release, then publishes it.
 4. Installed copies see it at next launch or within an hour, download it in the
    background, and show the popup.
+
+## Hosting limits and cost on free GitHub
+
+Checked against GitHub's docs on 2026-09-15
+([releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases),
+[Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)).
+Releasing many ~100 MB versions across several projects is sustainable **as
+long as the repos are public**.
+
+| Limit | What it means here |
+| --- | --- |
+| Each release file must be under **2 GiB** | A ~100 MB installer is fine |
+| Up to **1,000 files** per release | Booth uploads 4 (installer, portable `.exe`, `.blockmap`, `latest.yml`) |
+| Total release size and bandwidth | **No limit**, so versions × projects × downloads doesn't matter |
+
+Build minutes (GitHub Actions):
+
+- **Public repos:** standard GitHub-hosted runners, Windows included, are
+  **free with no minute cap**.
+- **Private repos on GitHub Free:** **2,000 minutes a month**, shared across
+  all your repos. A Windows Electron build takes roughly 5–10 minutes, so that
+  still allows a couple of hundred releases a month.
+- **Storage:** GitHub Free includes 500 MB of artifact storage and 10 GB of
+  cache per repo. The workflow above uploads straight to the release, not as an
+  Actions artifact, so it doesn't use that allowance.
+
+What would change this:
+
+- **A private repo breaks auto-updates.** Release files in a private repo can't
+  be downloaded without a token, so installed apps couldn't fetch updates
+  unless a token shipped inside the app, which isn't safe. Keep release repos
+  public.
+- **Very large apps hit the 2 GiB file limit.** For example Katib's `runtime/`
+  is ~2.7 GB, mostly its 1.6 GB model, so an installer bundling it would likely
+  exceed the limit. Download large models on first run instead, from a separate
+  release asset or a model host, rather than packing them into the installer.
+- **Updates are usually much smaller than the installer.** With the
+  `.blockmap`, electron-updater downloads only the changed parts, not the full
+  ~100 MB.
+- **Old releases can be deleted.** Nothing requires keeping them. Users jumping
+  from a deleted version just download the full installer instead of only the
+  changes.
 
 ## Caveats
 
