@@ -78,13 +78,21 @@ Runs on `v*.*.*` tags, on `windows-latest`, with `contents: write`:
 
 1. Checks out the full history and tags, and sets up Node 24.
 2. Fails if the tag doesn't match the `package.json` version.
-3. `npm ci`, then `npm run release`, which builds and uploads to a draft
-   release.
+3. `npm ci`.
 4. Writes the **changelog from the conventional commit titles** since the
    previous `v*` tag (all commits for the first release), skipping
    `Initial commit` and `Release vX.Y.Z` bump commits, plus a compare link.
-5. Publishes the release as **Booth X.Y.Z** with that changelog and marks it
-   latest.
+5. Creates a **draft** release **Booth X.Y.Z** with that changelog.
+6. `npm run release`, which builds and uploads into that draft.
+7. Fails unless the draft has both `.exe` files, the `.blockmap` and
+   `latest.yml`.
+8. Publishes the draft and marks it latest.
+
+The draft is created before the build on purpose. electron-builder 26.15.3
+can start one uploader per Windows target at the same moment. When no release
+exists yet, each uploader creates its own draft, which splits the files across
+two releases (this happened on the first v1.0.0 run). Every uploader reuses an
+existing draft with the same tag, so creating the draft first avoids this.
 
 No secrets are needed beyond the built-in `GITHUB_TOKEN`. Because the changelog
 is built from commit titles, keep every commit title in conventional form
@@ -163,9 +171,9 @@ What would change this:
   `appId` as `com.booth.dub`, or updates won't match existing installs.
 - **The build is unsigned.** Windows SmartScreen may warn on the first manual
   install. Signing later needs `CSC_LINK` / `CSC_KEY_PASSWORD` in the workflow.
-- **Releases stay drafts until fully uploaded.** electron-builder uploads to a
-  draft by default; the workflow's last step publishes it, so users never see a
-  half-uploaded release.
+- **Releases stay drafts until fully uploaded.** The workflow uploads into a
+  draft and only publishes it once every file is there, so users never see a
+  half-uploaded release or one without `latest.yml`.
 
 ## Testing before going public
 

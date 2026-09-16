@@ -34,11 +34,6 @@ jobs:
 
       - run: npm ci
 
-      - name: Build and upload to a draft release
-        run: npm run release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Write the changelog from commit titles
         shell: bash
         run: |
@@ -56,11 +51,37 @@ jobs:
           } > notes.md
           cat notes.md
 
-      - name: Publish the release
+      # electron-builder uploads each target through its own publisher, and when
+      # no release exists each one creates a draft, leaving the files split
+      # across two releases. It reuses an existing draft, so create it first.
+      - name: Create the draft release
         shell: bash
         run: >
-          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
-          --title "Booth ${GITHUB_REF_NAME#v}" --notes-file notes.md
-          --draft=false --latest
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
+          --draft --verify-tag --title "Booth ${GITHUB_REF_NAME#v}" --notes-file notes.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and upload to the draft release
+        run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Publishing without latest.yml would break updates for everyone installed.
+      - name: Check every file reached the draft
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          have="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          echo "$have"
+          for f in "Booth-Setup-$v.exe" "Booth-Setup-$v.exe.blockmap" "Booth-$v-portable.exe" latest.yml; do
+            grep -qxF "$f" <<< "$have" || { echo "::error::$f is missing from the draft release"; exit 1; }
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the release
+        shell: bash
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
