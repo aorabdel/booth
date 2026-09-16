@@ -58,7 +58,7 @@ jobs:
         shell: bash
         run: >
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
-          --draft --verify-tag --title "Booth ${GITHUB_REF_NAME#v}" --notes-file notes.md
+          --draft --verify-tag --title "$GITHUB_REF_NAME" --notes-file notes.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

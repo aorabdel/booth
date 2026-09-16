@@ -82,7 +82,8 @@ Runs on `v*.*.*` tags, on `windows-latest`, with `contents: write`:
 4. Writes the **changelog from the conventional commit titles** since the
    previous `v*` tag (all commits for the first release), skipping
    `Initial commit` and `Release vX.Y.Z` bump commits, plus a compare link.
-5. Creates a **draft** release **Booth X.Y.Z** with that changelog.
+5. Creates a **draft** release named after the tag (**vX.Y.Z**) with that
+   changelog.
 6. `npm run release`, which builds and uploads into that draft.
 7. Fails unless the draft has both `.exe` files, the `.blockmap` and
    `latest.yml`.
