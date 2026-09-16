@@ -13,4 +13,6 @@ contextBridge.exposeInMainWorld("booth", {
   onStatus: (fn) => ipcRenderer.on("booth:status", (_e, s) => fn(s)),
   closeProject: () => ipcRenderer.invoke("booth:close"),
   export: (what, range) => ipcRenderer.invoke("booth:export", what, range),
+  // Lets the main process hold an update popup until the take is finished.
+  setRecording: (on) => ipcRenderer.send("booth:recording", !!on),
 });

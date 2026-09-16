@@ -15,6 +15,7 @@ const path = require("path");
 const {
   app, BrowserWindow, Menu, dialog, nativeTheme, nativeImage, shell, ipcMain,
 } = require("electron");
+const { autoUpdater } = require("electron-updater");
 
 const { startServer } = require("./server");
 const pf = require("./project-file");
@@ -734,6 +735,51 @@ function saveSession() {
   } catch (e) { log("could not save session:", e.message); }
 }
 
+// ------------------------------------------------------------------- updates
+
+let recording = false;       // a take is rolling in the page; never interrupt it
+let updateReady = null;      // version downloaded and waiting to be installed
+let updateOffered = null;    // version already offered, so the hourly check does not nag
+
+/** Installed builds update from GitHub Releases; the popup waits out a take. */
+function initAutoUpdater() {
+  // Dev runs and the portable .exe cannot update themselves.
+  if (!app.isPackaged || process.env.PORTABLE_EXECUTABLE_DIR) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;   // "Later" still installs on the next quit
+  autoUpdater.on("error", (e) => log("updater:", (e && e.message) || e));
+  autoUpdater.on("update-available", (info) => log("updater: downloading", info.version));
+  autoUpdater.on("update-downloaded", (info) => {
+    log("updater: ready", info.version);
+    updateReady = info.version;
+    offerUpdate();
+  });
+  const check = () => autoUpdater.checkForUpdates()
+    .catch((e) => log("updater:", (e && e.message) || e));
+  check();
+  setInterval(check, 60 * 60 * 1000);
+}
+
+async function offerUpdate() {
+  if (!updateReady || updateOffered === updateReady || recording) return;
+  if (!win || win.isDestroyed()) return;
+  updateOffered = updateReady;
+  const { response } = await dialog.showMessageBox(win, {
+    type: "info", icon: icon(), title: "Booth",
+    message: `Booth ${updateReady} is ready to install`,
+    detail: "Restart now to update. Your takes are already saved.\n\n"
+          + "Choose Later and it installs the next time you quit.",
+    buttons: ["Restart and update", "Later"], defaultId: 0, cancelId: 1,
+  });
+  // Quitting runs before-quit, so the session is saved and the service stopped.
+  if (response === 0) autoUpdater.quitAndInstall();
+}
+
+ipcMain.on("booth:recording", (_e, on) => {
+  recording = !!on;
+  if (!recording) offerUpdate();
+});
+
 // ------------------------------------------------------------------ start-up
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -754,6 +800,7 @@ app.whenReady().then(async () => {
   loadSettings();
   createWindow();
   buildMenu();
+  initAutoUpdater();
 
   log("exe      =", app.getPath("exe"));
   log("pipeline =", pipelineRoot());

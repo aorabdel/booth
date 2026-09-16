@@ -1177,6 +1177,7 @@ function abort() {
 }
 
 function setRollUi(rolling) {
+  if (window.booth && window.booth.setRecording) window.booth.setRecording(rolling);
   $("btnRoll").textContent = rolling ? (S.paused ? "■ keep take" : "■ stop") : "● record";
   $("btnRoll").classList.toggle("stop", rolling);
   $("kbdRoll").textContent = rolling ? "stop" : "record";
